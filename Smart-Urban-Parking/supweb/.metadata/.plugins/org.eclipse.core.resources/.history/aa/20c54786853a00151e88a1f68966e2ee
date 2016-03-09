@@ -1,0 +1,261 @@
+import os
+import sys
+import struct
+import string
+import sqlite3
+import time, datetime
+import threading, thread
+import bluetooth._bluetooth as bluez
+import requests
+import json
+def create_database():
+    database = sqlite3.connect("Car_database.db")
+    cursor = database.cursor()
+    cursor.execute("CREATE table if not EXISTS Detected_cars (KEY INTEGER Primary KEY,Plate_Number TEXT, Distance REAL, Time TEXT)")
+    database.commit()
+    #cursor.execute("CREATE table if not EXISTS State_lamp (KEY INTEGER Primary KEY,Eth0_Address TEXT, Time TEXT, BLE_thread_init TEXT, INT_connection_init TEXT, Database_thread_init TEXT)")
+    return database
+
+
+#Check Bluetooth specification (4.2) page 1289, Vol 2, Part E, Section: 7.8.11 - LE Set Scan Enable Command
+def hci_enable_le_scan(sock):
+    cmd_pkt = struct.pack("<BB", 0x01, 0x00) # Last parameter: duplicate filtering: 0x00 - disabled
+    bluez.hci_send_cmd(sock, OGF_LE_CTL, OCF_LE_SET_SCAN_ENABLE, cmd_pkt)
+    print "...sent scan enable"
+    
+
+def hci_le_set_scan_parameters(sock):
+    print "...setting up scan"  
+    # Check Bluetooth specification (4.2) Page 1286, Vol 2, Part E, Section: 7.8.10 - LE Set Scan Parameters Command
+    OWN_ADDR_TYPE = 0x00 #Own Address type: what to put in scan request packet 0x00 = Public Device Address, 0x01 - Random device Address
+    SCAN_TYPE = 0x00 #0x00 = Passive scanning, 0x01 = Active scanning
+    INTERVAL = 0x10 # Time between 2 scanning: value * 0.625 ms
+    WINDOW = 0x10 # Duration of LE scan : value * 0.625 ms
+    FILTER = 0x00 # all advertisements, not just whitelisted devices
+    # interval and window are uint_16, so we pad them with 0x0
+    cmd_pkt = struct.pack("<BBBBBBB", SCAN_TYPE, 0x0, INTERVAL, 0x0, WINDOW, OWN_ADDR_TYPE, FILTER)
+    #print "packed up: ", cmd_pkt
+    bluez.hci_send_cmd(sock, OGF_LE_CTL, OCF_LE_SET_SCAN_PARAMETERS, cmd_pkt)
+    print "...sent scan parameters command"
+
+def init_eth0_id():
+    id = 0
+    # Return the MAC address of interface
+    try:
+        eth_address = open('/sys/class/net/eth0/address').readline()
+        eth_address = eth_address[0:17]
+        
+        URL = 'http://127.0.0.1:8000/lamp_register_get/'
+        client = requests.session()
+        client.get(URL)
+        csrftoken = client.cookies['csrftoken']
+        
+        data = { "content_type": "set_queue", "content": str(eth_address) }
+        headers = {'Content-type': 'application/json',  "X-CSRFToken":csrftoken}
+        cookies = dict(client.cookies)
+        response = requests.post(URL, data=json.dumps(data), headers=headers,cookies=cookies)
+        r = response.json()
+        if r['HTTPRESPONSE']=="1":
+            INT_connection_init = ("OK - obtaining identifier for microcontroller... eth0: [" + eth_address + "]")
+        else:
+            INT_connection_init = ("ERROR - obtaining identifier for microcontroller..." + r['HTTPRESPONSE'])
+        
+    except Exception,e:
+        INT_connection_init = ("ERROR - obtaining identifier for microcontroller..." + str(e))
+    
+    return INT_connection_init
+#Generated Event format (LE Advertising Report Event) by the controller for the host after an incoming Advertising packet
+#Check Bluetooth Specification (v4.2), Vol 2, Part E, 5.4.4 HCI Event Packet (Page 786) + LE Advertising Report Event parameters (Page 1241)
+#In case of 1 generated report/responses:
+#1.byte : Packet type = HCI Event Packet = 0x04
+#2.byte : Event Code = 0x3E - event type for all LE event -> encapsulate all LE Controller speicific events
+#3.byte : Parameter Total Length
+#4.byte : Subevent Code = 0x02
+#5.byte : Number of responses = 0x01-0x19
+#6.byte : Event Type: Non Connectable unidirected advertising = 0x03
+#7.byte : Address Type
+#8-13   : Address
+#14.byte: Length of data (per reports)
+#15-45  : Maximum 31 bytes of Data
+#46.byte: RSSI in dBm
+
+
+  
+def Catch_and_Store_advertisement_meassages(sock):
+
+    global counter
+    global RSSI_average  
+    global semaphore
+    
+    j = 0
+    
+  
+    while(True):
+   
+        #Setup filter to receive only the events what we need
+        flt = bluez.hci_filter_new()
+        bluez.hci_filter_all_events(flt) # Enable all events, then mask it with HCI_EVENT_PKT = 0x04 check bluez source/lib/hci.h
+        bluez.hci_filter_set_ptype(flt, bluez.HCI_EVENT_PKT) #HCI Packet types: Bluetooth specification (4.2) page 2406, Vol 4, Part A, Section: 2 - Protocol
+        sock.setsockopt( bluez.SOL_HCI, bluez.HCI_FILTER, flt ) #(socket level)SOL_HCI = 0 check bluez source/lib/bluetooth.h
+        
+        packet = sock.recv(46)
+        
+        Packet_type,Event_Code,Parameter_Total_Length,Subevent_Code = struct.unpack("BBBB",packet[0:4])
+          
+        if((Packet_type == 0x04) & (Event_Code == 0x3E) & (Subevent_Code == 0x02)): 
+
+            try:
+                Code = ''.join(struct.unpack("sss",packet[14:17]))  # string.join concatenates elements where the seperator will be the calling string between the elements
+                
+            except:
+                # This is needed because if a BLE device advertises itself, but does not have data part, the previos command drops an exception
+                return
+        
+            if(Code == "SUP"): #Also need to check the checksum from the message
+                
+                try:          
+                    Check_Sum_from_Packet,RSSI = struct.unpack("Bb",packet[24:26])          
+                    Plate_Number = ''.join(struct.unpack("sssssss",packet[17:24]))
+                except:
+                    return
+                
+                # Calculate the "special" checksum generated by BLE TAG for further security    
+                Check_Sum_Genarated = 0
+                for i in range(0,7):
+                    Check_Sum_Genarated ^= ord(Plate_Number[i]) ^ ord(Code[j]) 
+                    if(j == 2): 
+                        j = 0    
+                    else:
+                        j = j+1
+                        
+                           
+                if(Check_Sum_Genarated == Check_Sum_from_Packet):  #Check the generated checksum
+                                       
+                    time_now = datetime.datetime.utcnow()        # UTC   
+                    distance = 0 # just for temporary reasons, has to be calculated based on the measured RSSI
+         
+                    
+                    #For testing
+                    if(TESTING):
+                        f = open('measurements.txt','a')
+                        f.write(str(RSSI) + "\n")
+                        f.close()
+                        #Testing
+                    
+                    #print RSSI
+                    # The averaging here is good only if 1 BLE TAG sending information
+                    # The formula used for distance calculation is not reliable, need to find a better one
+                    print "RSSI: ",RSSI
+                    if(counter < 20):
+                        counter = counter + 1
+                        RSSI_average += RSSI
+                    else:
+                        counter = 0
+                        
+                        RSSI_average = RSSI_average / 20
+                        print "RSSI average in dBm= ",RSSI_average
+                        distance = float(10**((-68-float(RSSI_average)) / (10 * 1.6)))  # Needs to be rethink!!!!
+                        RSSI_average = 0
+                        print "Distance: ",distance
+
+                    #block doubled access to the database
+                    semaphore.acquire()
+                    database = sqlite3.connect("Car_database.db")
+                    cursor = database.cursor()
+                    cursor.execute("SELECT * from Detected_cars WHERE Plate_Number=?",(str(Plate_Number),))
+                    if(cursor.fetchone() == None):         
+                        entry = (None,str(Plate_Number),distance,time_now) #don't forget to change the distance value!!!!
+                        cursor.execute("INSERT into Detected_cars VALUES(?,?,?,?)",entry)
+                        database.commit()          
+                    else:
+                        entry = (distance,time_now,str(Plate_Number))
+                        cursor.execute("UPDATE Detected_cars SET Distance=?, Time=? WHERE Plate_Number=?",entry)
+                        database.commit()
+                    
+                    database.close()
+                    semaphore.release()
+
+                    Code = ''
+                    
+
+
+def Database_Check(arg):
+    
+    global semaphore
+    
+    while(True):
+         
+        timestamp = datetime.datetime.utcnow() - datetime.timedelta(seconds = 10)       
+        #block doubled access to the database
+        semaphore.acquire()
+        database = sqlite3.connect("Car_database.db")
+        cursor = database.cursor()    
+        cursor.execute("DELETE from Detected_cars WHERE Time<?",(timestamp,))
+        database.commit()
+        #for row in cursor.execute("SELECT * from Detected_cars"):
+            #print row
+        
+        database.close()
+        semaphore.release()
+        
+        time.sleep(2)
+
+TESTING = 0
+counter = 0
+RSSI_average = 0
+
+
+
+semaphore = threading.BoundedSemaphore(value=1)
+
+# bluez functions, contstants can be found in bluez C source code in different files (lib/hci.h, lib/hci.c)
+# bluetooth._bluetooth = bluetooth.so shared object in: /usr/lib/python2.7/dist-packages/bluetooth/_bluetooth
+
+
+# Check Bluetooth specification (v4.2) Page 1271, Vol 2, Part E, section 7.8 LE Controller Commands
+OGF_LE_CTL=0x08 # LE Controller Commands Group Code
+OCF_LE_SET_SCAN_PARAMETERS=0x000B  # LE Set Scan Parameters Command -> Page 1286, Vol 2, Part E, Section: 7.8.10
+OCF_LE_SET_SCAN_ENABLE=0x000C      # LE Set Scan Enable Command
+
+#Check Bluetooth specification (v4.2) Page 1241, Vol 2, Part E, section 7.7.65.2 LE Advertising Report Event
+LE_META_EVENT = 0x3E # event type for all LE event -> encapsulate all LE Controller speicific events
+EVT_LE_ADVERTISING_REPORT=0x02 # subevent of LE_META_EVENT
+# Advertisment event types
+ADV_IND=0x00
+ADV_DIRECT_IND=0x01
+ADV_SCAN_IND=0x02
+ADV_NONCONN_IND=0x03
+ADV_SCAN_RSP=0x04
+
+# Very important to check the ID of the device with hciconfig dev!!! Sometimes it changes from 0 to 1 but no exception is dropped...
+dev_id = bluez.hci_get_route()
+try:
+    sock = bluez.hci_open_dev(dev_id)
+    hci_le_set_scan_parameters(sock)
+    hci_enable_le_scan(sock)
+    thread.start_new_thread( Catch_and_Store_advertisement_meassages, (sock,) )
+    BLE_thread_init = "OK - accessing bluetooth device..."
+except Exception,e:
+    BLE_thread_init = ("ERROR - accessing bluetooth device and catch thread..." + str(e))
+    #sys.exit(1)
+
+if(TESTING):
+    os.remove('measurements.txt')
+    
+try:
+    database = create_database()
+    thread.start_new_thread( Database_Check,("",))
+    Database_thread_init = "OK - starting database check thread..."
+except Exception,e:
+    Database_thread_init = ("ERROR - starting database check..." + str(e))
+
+INT_connection_init = init_eth0_id()
+
+print (INT_connection_init)
+print (BLE_thread_init)
+print (Database_thread_init)
+
+while True:
+    time.sleep(1)
+  
+    

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
+	<link rel="stylesheet" href="http://leaflet.github.io/Leaflet.draw/leaflet.draw.css" />
+    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/themes/cupertino/jquery-ui.css" type="text/css" media="all" />
+	
+	<style>
+	.addlink 
+    	{padding-left: 12px;background: transparent url("../static/admin/img/icon_addlink.gif") no-repeat scroll 0px 0.2em;}
+		
+	div.toolbox 
+		{background:#D8FBD6;border:3px dotted black;padding:2px;}
+	div.toolbox div.content 
+		{width:98%;background:#75CE6F;color:white;border:1px dotted green;text-align:left;padding:3px;}
+	.changelink
+		{padding-left: 12px;background: transparent url("../static/admin/img/icon_changelink.gif") no-repeat scroll 0px 0.2em;}
+	.deletelink 
+		{background: transparent url("../static/admin/img/icon_deletelink.gif") no-repeat scroll 0px 50%;padding-left: 14px;}
+	.info {
+	    padding: 6px 8px;
+	    font: 14px/16px Arial, Helvetica, sans-serif;
+	    background: white;
+	    background: rgba(255,255,255,0.8);
+	    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+	    border-radius: 5px;
+	}
+	.info h4 {
+	    margin: 0 0 5px;
+	    color: #777;
+	}
+	</style>
+
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/jquery-ui.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
+    <script src="http://leaflet.github.io/Leaflet.draw/leaflet.draw.js"></script>
+	<script type="text/javascript">
+    	{{map_handle_script}}
+	</script>
+</head>
+<body>
+	<div>
+		<div id="map" style="width: 65%; height: 500px; "></div>
+    </div>  
+    
+</body>
+</html>

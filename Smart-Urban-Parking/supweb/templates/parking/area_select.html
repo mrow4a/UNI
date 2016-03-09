@@ -1,0 +1,10 @@
+
+		<select id="area_list" >
+		{% if area_list %}
+			{% for area_name in area_list %}
+				<option value="{{area_name}}">{{area_name}}</option>
+			{% endfor %}
+		{% endif %}
+		</select>
+
+

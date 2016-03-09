@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
+	<link rel="stylesheet" href="http://leaflet.github.io/Leaflet.draw/leaflet.draw.css" />
+    <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/themes/cupertino/jquery-ui.css" type="text/css" media="all" />
+	
+	<style>
+	.addlink 
+    	{padding-left: 12px;background: transparent url("../static/admin/img/icon_addlink.gif") no-repeat scroll 0px 0.2em; }
+		
+	div.toolbox 
+		{background:#fff;border:3px;padding:2px;}
+	div.toolbox div.p {
+  		margin: 0;
+  		padding: 2px 5px 3px 5px;
+  		font-size: 11px;
+  		text-align: left;
+  		font-weight: bold;
+  		background: #7CA0C7 url(../static/admin/img/default-bg.gif) top left repeat-x;
+  		color: #fff;
+	}
+	div.toolbox div.content 
+		{width:98%;background:#fff;color:#7CA0C7; border:1px solid #7CA0C7; text-align:left;padding:3px;}
+	.changelink
+		{padding-left: 12px;background: transparent url("../static/admin/img/icon_changelink.gif") no-repeat scroll 0px 0.2em;}
+	.deletelink 
+		{background: transparent url("../static/admin/img/icon_deletelink.gif") no-repeat scroll 0px 50%;padding-left: 14px;}
+	.info {
+	    padding: 6px 8px;
+	    font: 11px/12px Arial, Helvetica, sans-serif;
+	    background: white;
+	    background: rgba(255,255,255,0.8);
+	    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+	    border-radius: 5px;
+	}
+	.info h4 {
+	    margin: 0 0 5px;
+	    color: #777;
+	}	
+	div.toolbox div.content div.lamp_status
+		{ overflow:auto; height: 200px; }
+	
+		
+	</style>
+
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/jquery-ui.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
+    <script src="http://leaflet.github.io/Leaflet.draw/leaflet.draw.js"></script>
+	<script type="text/javascript">
+    	{{map_handle_script}}
+	</script>
+</head>
+<body>
+    
+    <div class="colMS" style="width: 55%; margin: 10px 15px;">
+        <h1>Smart Urban Parking</h1>
+		<div id="map" style="float: left; width: 100%;height: 620px;"></div>
+		<div style="float: right; width: 35em; position: relative; margin-right: -36em;">
+			
+		    <div class="toolbox" >
+				<div class="p" >Lamp edit</div>
+				<div id="lamp_edit_div" class="content">
+					<div >
+						<div id="lamp_points" style="display:inline-block"></div>
+					</div>
+					<div id="changelamp">
+							<b>Max_range:</b> <input type="text" id="max_range_change_text" value="20"> 
+					</div>
+					<div id="eth0_edit_div">
+					</div>
+					</br>
+					<div>
+		    			<div style="display:inline-block"><span id="editLamppoints">Edit</span> </div>
+						<div style="display:inline-block"><span id="saveLampEdit">Save</span> </div>
+		    		</div>	
+		    		
+			    	<div>
+			    		<div style="display:inline-block"><span id="addParking">Add parking to lamp</span> </div>
+			    		<div style="display:inline-block"><span id="saveParking">Save parking</span> </div>
+			    	</div>
+					<div id="capacity_div">
+						</br><b>Parking capacity:</b> <input type="text" id="capacity_text" value="10"> 
+					</div>
+					<div>
+						<a id="deletelamp" class="deletelink" >Delete selected lamp</a>
+					</div>
+		    	</div>	
+		    	<div></br></div>
+		    	<div class="p" >Parking edit</div>	
+		    	<div id="parking_edit_div" class="content">
+					<div >
+						<div id="parking_points" style="display:inline-block"></div>
+					</div>
+					<div id="change_capacity_div">
+						</br><b>Parking capacity:</b> <input type="text" id="change_capacity_text" value="10"> 
+					</div>
+					</br>
+			    	<div>
+			    		<div style="display:inline-block"><span id="editParking">Edit parking</span> </div>
+			    		<div style="display:inline-block"><span id="SaveEditParking">Save parking</span> </div>
+			    	</div>
+					<div>
+						<a id="changeparking" class="changelink" >Change selected parking</a>
+					</div>
+					<div>
+						<a id="deleteparking" class="deletelink" >Delete selected parking</a>
+					</div>
+		    	</div>
+		    	<div></br></div>
+		    	<div class="p" >Lamp add</div>	
+		    	<div id="lamp_add_div" class="content">
+		    		<div>
+						<div id="map_points" style="display:inline-block"></div>
+						<div id="max_range_div">
+							<b>Max_range:</b> <input type="text" id="max_range_text" value="20"> 
+						</div>
+						<div id="eth0_add_div">
+						</div>
+					</div>
+					</br>
+			    	<div>
+			    		<div style="display:inline-block"><span id="addLamp">Add lamp</span> </div>
+			    		<div style="display:inline-block"><span id="saveLamp">Save lamp</span> </div>
+			    	</div>
+		    	</div>
+		    	<div>
+		    		</br>
+			    	<div style="display:inline-block"><span id="cancelLamppoints">Cancel</span> </div>
+			    	<div style="display:inline-block"><span id="refresh">Refresh</span> </div>
+					<div style="display:inline-block"><span id="status">Status</span> </div>
+			    	
+		    	</div>
+		    	<div></br></div>
+		    	<div class="p" >Lamp-Server Communication</div>	
+		    	<div id="lampserver_div" class="content">
+					<div>
+						Resolve the communication problems
+					</div>
+					<div id="lamp_status">
+						<table id = "lamp_status_table"></table>
+					</div>
+		    	</div>
+		    </div>
+		</div>	
+    </div>
+</body>
+</html>
