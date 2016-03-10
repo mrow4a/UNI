@@ -43,3 +43,8 @@ Structure:
 * select_text 
 [jumps over contents of the file with file pointer, buffers words, and if word finishes with 't' returns word, and goes back to file to continue searching]
 
+# Python
+Structure:
+
+* Stepcounter
+[stepscounting based on accelerator data]
