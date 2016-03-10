@@ -20,6 +20,9 @@ Structure:
 
 Structure:
 
+* termostat
+[embedded systems - termostat with display segments]
+
 * strtol
 [strtol function implementation from description]
 
