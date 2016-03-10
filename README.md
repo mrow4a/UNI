@@ -10,6 +10,12 @@ Structure:
 * manage
 [STL, Templates, Operator Overloading etc]
 
+* employer
+[inheritance]
+
+* compex numbers calculator
+[operator overloading]
+
 # Programming and Data Structures in C
 
 Structure:
